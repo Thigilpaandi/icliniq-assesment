@@ -76,4 +76,4 @@ jobs:
           terraform apply -input=false -auto-approve tfplan
 
       - name: Done
-        run: echo "Deployed image: $IMAGE"
+        run: echo "Deployed image:$IMAGE"
