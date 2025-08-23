@@ -24,22 +24,32 @@ resource "google_logging_metric" "app_error_count" {
 }
 
 # Notification channels
+# Webhook (Google Chat via webhook URL)
 resource "google_monitoring_notification_channel" "chat" {
-  count        = var.chat_webhook_url == null ? 0 : 1
-  display_name = "Chat - ${var.service_name}"
+  count        = length(trimspace(coalesce(var.chat_webhook_url, ""))) > 0 ? 1 : 0
   type         = "webhook_tokenauth"
+  display_name = "Chat - ${var.service_name}"
   labels = {
-    url = var.chat_webhook_url
+    url = var.chat_webhook_url     # 'url' is the only valid key for webhook_tokenauth
   }
 }
 
+# Email
 resource "google_monitoring_notification_channel" "email" {
-  count        = var.alert_email == null ? 0 : 1
-  display_name = "Email - ${var.service_name}"
+  count        = length(trimspace(coalesce(var.alert_email, ""))) > 0 ? 1 : 0
   type         = "email"
+  display_name = "Email - ${var.service_name}"
   labels = {
     email_address = var.alert_email
   }
+}
+
+# If alert policies reference channels, build the list safely:
+locals {
+  channel_ids = concat(
+    try(google_monitoring_notification_channel.chat[*].id, []),
+    try(google_monitoring_notification_channel.email[*].id, [])
+  )
 }
 
 # CPU > 70% -> Chat (warning)
