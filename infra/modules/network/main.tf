@@ -23,7 +23,7 @@ resource "google_compute_global_address" "private_ip" {
   name          = "${var.network_name}-psc"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
-  prefix_length = 24
+  prefix_length = 25
   network       = google_compute_network.vpc.id
 }
 
