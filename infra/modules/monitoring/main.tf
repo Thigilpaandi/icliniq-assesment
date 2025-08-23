@@ -29,7 +29,7 @@ resource "google_monitoring_notification_channel" "chat" {
   display_name = "Chat - ${var.service_name}"
   type         = "webhook_tokenauth"
   labels = {
-    webhook_url = var.chat_webhook_url
+    url = var.chat_webhook_url
   }
 }
 
