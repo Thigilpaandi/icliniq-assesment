@@ -10,28 +10,23 @@ resource "google_compute_network" "vpc" {
   auto_create_subnetworks = false
 }
 
-resource "google_compute_subnetwork" "subnet" {
-  name          = var.subnet_name
-  ip_cidr_range = "10.0.0.0/24"
-  region        = var.region
-  network       = google_compute_network.vpc.id
-  private_ip_google_access = true
-}
 
-# Private Service Connect / Service Networking for Cloud SQL Private IP
-resource "google_compute_global_address" "private_ip" {
-  name          = "${var.network_name}-psc"
+# PSA range (replace your existing one if prefix_length < 24)
+resource "google_compute_global_address" "private_service_range" {
+  name          = var.private_service_range_name # e.g., "sql-psa-range"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
-  prefix_length = 25
-  network       = google_compute_network.vpc.id
+  prefix_length = 24                              # ✅ /24 minimum
+  network       = google_compute_network.vpc.self_link
 }
 
 resource "google_service_networking_connection" "private_vpc_connection" {
-  network                 = google_compute_network.vpc.id
+  network                 = google_compute_network.vpc.self_link
   service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.private_ip.name]
+  reserved_peering_ranges = [google_compute_global_address.private_service_range.name]
+  depends_on              = [google_compute_global_address.private_service_range]
 }
+
 
 resource "google_vpc_access_connector" "serverless" {
   name   = var.serverless_connector
