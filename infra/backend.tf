@@ -1,9 +1,6 @@
-
-# Configure a backend as needed for your environment (e.g., GCS).
-# By default, local state is used.
-# terraform {
-#   backend "gcs" {
-#     bucket = "YOUR_TF_STATE_BUCKET"
-#     prefix = "secure-node-gcr"
-#   }
-# }
+terraform {
+  backend "gcs" {
+    bucket = "peppy-ridge-469911-c2-tf-state-795949345048"
+    prefix = "secure-node-gcr"
+  }
+}
