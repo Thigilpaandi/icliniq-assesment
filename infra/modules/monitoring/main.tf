@@ -2,7 +2,15 @@
 variable "project_id"       { type = string }
 variable "region"           { type = string }
 variable "service_name"     { type = string }
+variable "chat_webhook_url" {
+  type    = string
+  default = null
+}
 
+variable "alert_email" {
+  type    = string
+  default = null
+}
 
 # Log-based metric for errors
 resource "google_logging_metric" "app_error_count" {
