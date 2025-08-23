@@ -30,10 +30,7 @@ resource "google_cloud_run_v2_service" "svc" {
       resources {
         limits = { cpu = "1", memory = "512Mi" }
       }
-      env {
-        name  = "PORT"
-        value = "8080"
-      }
+
       env {
         name = "DB_HOST"
         value = var.db_host
