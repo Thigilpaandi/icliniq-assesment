@@ -13,7 +13,7 @@ resource "google_compute_network" "vpc" {
 
 # PSA range (replace your existing one if prefix_length < 24)
 resource "google_compute_global_address" "private_service_range" {
-  name          = var.private_service_range_name # e.g., "sql-psa-range"
+  name          = var.subnet_name # e.g., "sql-psa-range"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
   prefix_length = 24                              # ✅ /24 minimum
