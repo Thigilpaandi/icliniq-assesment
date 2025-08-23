@@ -2,6 +2,7 @@
 variable "project_id" { type = string }
 variable "db_name"    { type = string }
 variable "db_user"    { type = string }
+variable "region"     { type = string }
 
 resource "random_password" "db_password" {
   length  = 24
