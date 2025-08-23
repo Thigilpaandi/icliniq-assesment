@@ -26,8 +26,8 @@ resource "google_logging_metric" "app_error_count" {
 # Notification channels
 resource "google_monitoring_notification_channel" "chat" {
   count        = var.chat_webhook_url == null ? 0 : 1
-  display_name = "Dev Chat"
-  type         = "google_chat"
+  display_name = "Chat - ${var.service_name}"
+  type         = "webhook_tokenauth"
   labels = {
     webhook_url = var.chat_webhook_url
   }
@@ -35,7 +35,7 @@ resource "google_monitoring_notification_channel" "chat" {
 
 resource "google_monitoring_notification_channel" "email" {
   count        = var.alert_email == null ? 0 : 1
-  display_name = "Ops Email"
+  display_name = "Email - ${var.service_name}"
   type         = "email"
   labels = {
     email_address = var.alert_email
