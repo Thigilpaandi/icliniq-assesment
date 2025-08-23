@@ -152,10 +152,7 @@ variable "min_instances" {
   type        = number
   default     = 0
 
-  validation {
-    condition     = var.min_instances >= 0
-    error_message = "min_instances must be >= 0."
-  }
+
 }
 
 variable "max_instances" {
@@ -163,10 +160,7 @@ variable "max_instances" {
   type        = number
   default     = 4
 
-  validation {
-    condition     = var.max_instances >= 0 && var.max_instances >= var.min_instances
-    error_message = "max_instances must be >= 0 and >= min_instances."
-  }
+
 }
 
 variable "container_concurrency" {
@@ -174,8 +168,5 @@ variable "container_concurrency" {
   type        = number
   default     = 80
 
-  validation {
-    condition     = var.container_concurrency >= 1
-    error_message = "container_concurrency must be >= 1."
-  }
+
 }
