@@ -13,6 +13,7 @@ module "secrets" {
   project_id      = var.project_id
   db_name         = var.db_name
   db_user         = var.db_user
+  region                = var.region
 }
 
 module "sql" {
