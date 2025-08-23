@@ -10,7 +10,13 @@ resource "random_password" "db_password" {
 
 resource "google_secret_manager_secret" "db_name" {
   secret_id  = "DB_NAME"
-  replication { automatic = true }
+  replication {
+  user_managed {
+    replicas {
+      location = var.region
+    }
+  }
+}
 }
 
 resource "google_secret_manager_secret_version" "db_name_v" {
@@ -20,7 +26,13 @@ resource "google_secret_manager_secret_version" "db_name_v" {
 
 resource "google_secret_manager_secret" "db_user" {
   secret_id  = "DB_USER"
-  replication { automatic = true }
+  replication {
+  user_managed {
+    replicas {
+      location = var.region
+    }
+  }
+}
 }
 
 resource "google_secret_manager_secret_version" "db_user_v" {
@@ -30,7 +42,13 @@ resource "google_secret_manager_secret_version" "db_user_v" {
 
 resource "google_secret_manager_secret" "db_password" {
   secret_id  = "DB_PASSWORD"
-  replication { automatic = true }
+  replication {
+  user_managed {
+    replicas {
+      location = var.region
+    }
+  }
+}
 }
 
 resource "google_secret_manager_secret_version" "db_password_v" {
