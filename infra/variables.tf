@@ -23,9 +23,16 @@ variable "image" { type = string default = null } # e.g. "europe-west2-docker.pk
 variable "runtime_sa_name" { type = string default = "run-secure-node-sa" }
 variable "deployer_service_account_email" { type = string description = "SA email used by GitHub OIDC to deploy" }
 
-# Monitoring & Alerts
-variable "chat_webhook_url" { type = string default = null }
-variable "alert_email"      { type = string default = null }
+variable "chat_webhook_url" {
+  type    = string
+  default = null
+}
+
+variable "alert_email" {
+  type    = string
+  default = null
+}
+
 
 # Cloud Run
 variable "ingress" { type = string default = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" } # or INGRESS_TRAFFIC_ALL
