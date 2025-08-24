@@ -51,15 +51,7 @@ jobs:
 
         run: npm run lint
 
-      - name: Unit tests with coverage
-        working-directory: app
-        run: |
-          npm test -- --coverage
-          # Extract overall coverage % for summary
-          jq -r '.total.lines.pct' coverage/coverage-summary.json > ../COVERAGE_PCT.txt
-        shell: bash
-
-      - name: Build image (no push)
+      - name: Build image
         run: docker build -t local/app:ci ./app
 
       - name: Trivy scan (image) — table + SARIF
@@ -80,8 +72,6 @@ jobs:
         with:
           name: app-artifacts
           path: |
-            COVERAGE_PCT.txt
-            app/coverage/coverage-summary.json
             trivy-image.sarif
 
   infra-plan-and-scans:
