@@ -31,13 +31,7 @@ resource "google_sql_database_instance" "this" {
   }
 }
 
-# Dummy resource to model dependency on service networking established in VPC module.
-# In cross-module reality, the connection already exists. We create a no-op here for explicit dependency wiring.
-resource "google_service_networking_connection" "dep" {
-  network  = var.private_network_id
-  service  = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = []
-}
+
 
 resource "google_sql_database" "db" {
   name     = var.db_name
