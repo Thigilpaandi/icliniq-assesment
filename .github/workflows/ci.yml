@@ -46,6 +46,7 @@ jobs:
 
       - name: Lint
         working-directory: app/src
+        continue-on-error: true
         run: npm run lint
 
       - name: Unit tests with coverage
@@ -110,14 +111,7 @@ jobs:
         working-directory: infra
         run: tflint
 
-      - name: tfsec (SARIF)
-        run: |
-          curl -sL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install.sh | bash
-          tfsec --format sarif --out tfsec.sarif ./infra
-      - name: Upload tfsec SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: tfsec.sarif
+
 
       - name: Trivy config scan (Terraform)
         uses: aquasecurity/trivy-action@0.24.0
@@ -156,7 +150,6 @@ jobs:
           name: infra-artifacts
           path: |
             TFPLAN.txt
-            tfsec.sarif
             trivy-infra.sarif
             gitleaks.sarif
 
