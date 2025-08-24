@@ -66,7 +66,9 @@ resource "google_monitoring_alert_policy" "cpu_warn" {
     }
   }
 
-  notification_channels = local.channel_ids
+  notification_channels = concat(
+    google_monitoring_notification_channel.chat[*].name
+  )
   documentation { content = "CPU p95 > 70% for 5m on ${var.service_name}" }
 }
 
@@ -92,7 +94,9 @@ resource "google_monitoring_alert_policy" "resource_critical" {
     }
   }
 
-  notification_channels = local.channel_ids
+  notification_channels = concat(
+    google_monitoring_notification_channel.email[*].name
+  )
   documentation { content = "Memory p95 > 80% for 5m on ${var.service_name}" }
 }
 
