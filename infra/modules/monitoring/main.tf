@@ -44,63 +44,55 @@ resource "google_monitoring_notification_channel" "email" {
 }
 
 
+# CPU warn (>70% p95 over 5m)
 resource "google_monitoring_alert_policy" "cpu_warn" {
   display_name = "CPU > 70% (${var.service_name})"
   combiner     = "OR"
 
   conditions {
-    display_name = "CPU utilization > 70%"
+    display_name = "CPU utilizations p95 > 70%"
     condition_threshold {
-      # Cloud Run CPU utilization (GAUGE/DOUBLE)
-      filter          = "metric.type=\"run.googleapis.com/container/cpu/utilization\" resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"${var.service_name}\""
+      filter          = "resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"${var.service_name}\" metric.type=\"run.googleapis.com/container/cpu/utilizations\""
       comparison      = "COMPARISON_GT"
-      threshold_value = 0.70
+      threshold_value = 0.70          # fraction (70%)
       duration        = "300s"
 
       aggregations {
         alignment_period     = "60s"
-        per_series_aligner   = "ALIGN_MEAN"       # OK for GAUGE/DOUBLE
+        per_series_aligner   = "ALIGN_PERCENTILE_95"
         cross_series_reducer = "REDUCE_MEAN"
         group_by_fields      = ["resource.label.service_name"]
       }
     }
   }
 
-  notification_channels = concat(
-    google_monitoring_notification_channel.chat[*].name
-  )
-  documentation {
-    content = "CPU utilization warning for ${var.service_name}"
-  }
+  notification_channels = local.channel_ids
+  documentation { content = "CPU p95 > 70% for 5m on ${var.service_name}" }
 }
 
-# CPU or Memory > 80% -> Email (critical)
+# Memory critical (>80% p95 over 5m)
 resource "google_monitoring_alert_policy" "resource_critical" {
   display_name = "Memory > 80% (${var.service_name})"
   combiner     = "OR"
 
   conditions {
-    display_name = "Memory utilization > 80%"
+    display_name = "Memory utilizations p95 > 80%"
     condition_threshold {
-      filter          = "metric.type=\"run.googleapis.com/container/memory/utilization\" resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"${var.service_name}\""
+      filter          = "resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"${var.service_name}\" metric.type=\"run.googleapis.com/container/memory/utilizations\""
       comparison      = "COMPARISON_GT"
       threshold_value = 0.80
       duration        = "300s"
 
       aggregations {
         alignment_period     = "60s"
-        per_series_aligner   = "ALIGN_MEAN"
+        per_series_aligner   = "ALIGN_PERCENTILE_95"
         cross_series_reducer = "REDUCE_MEAN"
         group_by_fields      = ["resource.label.service_name"]
       }
     }
   }
 
-
-  notification_channels = concat(
-    google_monitoring_notification_channel.email[*].name
-  )
-  documentation {
-    content = "Critical resource utilization for ${var.service_name}"
-  }
+  notification_channels = local.channel_ids
+  documentation { content = "Memory p95 > 80% for 5m on ${var.service_name}" }
 }
+
