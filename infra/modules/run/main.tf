@@ -30,6 +30,13 @@ resource "google_cloud_run_v2_service" "svc" {
       resources {
         limits = { cpu = "1", memory = "512Mi" }
       }
+startup_probe {
+  tcp_socket { port = 8080 }
+  period_seconds        = 10
+  timeout_seconds       = 5
+  failure_threshold     = 12   # ~2 minutes
+  initial_delay_seconds = 0
+}
 
       env {
         name = "DB_HOST"
