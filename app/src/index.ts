@@ -59,21 +59,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   console.error('unhandled route error:', err);
   res.status(500).json({ error: 'Internal Server Error' });
 });
-import { Router } from 'express';
-import { pool } from '../db';
-
-export const router = Router();
-
-// GET /api/v1/db/ping  ->  { ok: true, now: "..." }
-router.get('/db/ping', async (_req, res) => {
-  try {
-    const { rows } = await pool.query('select now() as now');
-    res.json({ ok: true, now: rows[0].now });
-  } catch (e) {
-    console.error('db ping failed:', e);
-    res.status(500).json({ ok: false, error: 'db_unreachable' });
-  }
-});
 
 /**
  * Start the HTTP listener.
