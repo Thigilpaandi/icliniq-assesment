@@ -16,6 +16,8 @@ resource "google_sql_database_instance" "this" {
   database_version = var.db_version
   deletion_protection = var.deletion_protection
 
+  depends_on = [google_service_networking_connection.dep]
+
   settings {
     tier = var.db_tier
     ip_configuration {
@@ -27,6 +29,12 @@ resource "google_sql_database_instance" "this" {
       enabled = true
     }
   }
+}
+
+resource "google_service_networking_connection" "dep" {
+  network  = var.private_network_id
+  service  = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = []
 }
 
 
