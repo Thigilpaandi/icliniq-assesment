@@ -1,7 +1,7 @@
 # ---- Builder ----
 FROM node:20-alpine AS builder
 WORKDIR /app
-
+ 
 # Install ALL deps (including dev) using the lockfile
 COPY package.json package-lock.json ./
 RUN npm ci
