@@ -40,7 +40,7 @@ app.use(
  * Keep these endpoints FAST and side-effect free.
  */
 app.get('/', (_req, res) => res.status(200).send('ok'));
-app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }));
+app.get('/healthz', (_req,res)=>res.status(200).json({status:'ok'}));
 
 /**
  * API routes
