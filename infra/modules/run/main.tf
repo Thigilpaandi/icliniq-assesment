@@ -30,13 +30,28 @@ resource "google_cloud_run_v2_service" "svc" {
       resources {
         limits = { cpu = "1", memory = "512Mi" }
       }
-startup_probe {
-  tcp_socket { port = 8080 }
-  period_seconds        = 10
-  timeout_seconds       = 5
-  failure_threshold     = 12   # ~2 minutes
-  initial_delay_seconds = 0
-}
+      startup_probe {
+        # Use HTTP to your fast health endpoint
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
+        initial_delay_seconds = 0
+        period_seconds        = 10
+        timeout_seconds       = 5
+        failure_threshold     = 24  # ~4 minutes (24 * 10s)
+      }
+
+      # Optional: control when the service starts routing traffic
+      readiness_probe {
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
+        period_seconds    = 5
+        timeout_seconds   = 2
+        failure_threshold = 6  # ~30s to consider ready
+      }
 
       env {
         name = "DB_HOST"
