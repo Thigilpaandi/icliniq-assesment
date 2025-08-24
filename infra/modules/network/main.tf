@@ -16,7 +16,7 @@ resource "google_compute_global_address" "private_service_range" {
   name          = var.subnet_name # e.g., "sql-psa-range"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
-  prefix_length = 24                              # ✅ /24 minimum
+  prefix_length = 28                             # ✅ /24 minimum
   network       = google_compute_network.vpc.self_link
 }
 
