@@ -14,6 +14,15 @@ router.get('/items', async (_req, res) => {
     res.status(500).json({ error: 'DB error' });
   }
 });
+router.get('/db/ping', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('select now() as now');
+    res.json({ ok: true, now: rows[0].now });
+  } catch (e) {
+    console.error('db ping failed:', e);
+    res.status(500).json({ ok: false });
+  }
+});
 
 router.post('/items', async (req, res) => {
   const schema = z.object({ name: z.string().min(1).max(200) });
