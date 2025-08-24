@@ -23,6 +23,15 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      # keep your inputs exactly as before
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_artifact_registry_repo: ${{ vars.ARTIFACT_REPO || 'apps' }}
+      TF_VAR_deployer_service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+      TF_LOG: INFO
 
     steps:
       - uses: actions/checkout@v4
@@ -48,23 +57,28 @@ jobs:
           terraform workspace select "${{ github.event.inputs.workspace }}" \
             || terraform workspace new "${{ github.event.inputs.workspace }}"
 
-      - name: Plan (destroy) – preview
+      # --- One-off safety knobs to unblock deletion ---
+      - name: Disable SQL deletion protection (one-off)
         working-directory: infra
-        env:
-          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ vars.GCP_REGION }}
-          TF_VAR_artifact_registry_repo: ${{ vars.ARTIFACT_REPO || 'apps' }}
-          TF_VAR_deployer_service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
-          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-        run: terraform plan -destroy -input=false
-      - name: Terraform destroy – execute
+        run: |
+          set -e
+          files=$(git ls-files '*.tf')
+          if grep -R "google_sql_database_instance" -n $files >/dev/null 2>&1; then
+            sed -i 's/deletion_protection *= *true/deletion_protection = false/g' $files || true
+          fi
+
+      - name: (Optional) Force-destroy GCS buckets if present
         working-directory: infra
-        env:
-          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ vars.GCP_REGION }}
-          TF_VAR_artifact_registry_repo: ${{ vars.ARTIFACT_REPO || 'apps' }}
-          TF_VAR_deployer_service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
-          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-        run: terraform destroy -input=false -auto-approve
+        run: |
+          files=$(git ls-files '*.tf')
+          sed -i 's/force_destroy *= *false/force_destroy = true/g' $files || true
+
+      # --- Staged destroy to release dependencies cleanly ---
+      - name: Phase 1 — Destroy Cloud Run first (unblocks VPC connector)
+        working-directory: infra
+        run: terraform destroy -input=false -auto-approve -target=module.run || true
+        # ^ adjust target to your module name if different
+
+      - name: Phase 2 — Full destroy (serial, clearer logs)
+        working-directory: infra
+        run: terraform destroy -input=false -auto-approve -parallelism=1 -no-color
