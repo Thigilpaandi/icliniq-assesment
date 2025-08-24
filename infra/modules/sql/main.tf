@@ -35,12 +35,7 @@ resource "google_service_networking_connection" "dep" {
   network  = var.private_network_id
   service  = "servicenetworking.googleapis.com"
   reserved_peering_ranges = []
-  lifecycle {
-    prevent_destroy = true
-    # Make SQL module read-only for this connection, so it won't try to
-    # add/remove ranges or recreate the connection.
-    ignore_changes  = [reserved_peering_ranges, network, service]
-  }
+
 }
 
 
