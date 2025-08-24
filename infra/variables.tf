@@ -139,7 +139,7 @@ variable "alert_email" {
 variable "ingress" {
   description = "Ingress policy for Cloud Run (INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER or INGRESS_TRAFFIC_ALL)."
   type        = string
-  default     = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  default     = "INGRESS_TRAFFIC_ALL"
 
   validation {
     condition     = contains(["INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER", "INGRESS_TRAFFIC_ALL"], var.ingress)
