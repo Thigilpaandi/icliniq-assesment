@@ -42,16 +42,7 @@ resource "google_cloud_run_v2_service" "svc" {
         failure_threshold     = 24  # ~4 minutes (24 * 10s)
       }
 
-      # Optional: control when the service starts routing traffic
-      readiness_probe {
-        http_get {
-          path = "/healthz"
-          port = 8080
-        }
-        period_seconds    = 5
-        timeout_seconds   = 2
-        failure_threshold = 6  # ~30s to consider ready
-      }
+      
 
       env {
         name = "DB_HOST"
