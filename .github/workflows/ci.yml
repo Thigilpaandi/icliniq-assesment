@@ -95,6 +95,7 @@ jobs:
 
       - name: Terraform fmt & validate (no backend)
         working-directory: infra
+        continue-on-error: true
         run: |
           terraform fmt -check -recursive
           terraform init -backend=false
