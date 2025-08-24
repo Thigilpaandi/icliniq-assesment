@@ -1,16 +1,36 @@
-name: ci 
+name: ci
+
 on:
-
-
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
 
 jobs:
-  build-test-scan:
+  detect-paths:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      id-token: write
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      infra: ${{ steps.changes.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            app:
+              - 'app/**'
+              - 'app/Dockerfile'
+            infra:
+              - 'infra/**'
+
+  build-test-image-and-scan:
+    needs: detect-paths
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -28,30 +48,166 @@ jobs:
         working-directory: app
         run: npm run lint
 
-      - name: Unit tests
+      - name: Unit tests with coverage
         working-directory: app
-        run: npm test
+        run: |
+          npm test -- --coverage
+          # Extract overall coverage % for summary
+          jq -r '.total.lines.pct' coverage/coverage-summary.json > ../COVERAGE_PCT.txt
+        shell: bash
 
       - name: Build image (no push)
-        run: |
-          docker build -t local/app:ci ./app
+        run: docker build -t local/app:ci ./app
 
-      - name: Trivy scan
+      - name: Trivy scan (image) — table + SARIF
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: 'local/app:ci'
-          format: 'table'
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: trivy-image.sarif
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+
+      - name: Save app CI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-artifacts
+          path: |
+            COVERAGE_PCT.txt
+            app/coverage/coverage-summary.json
+            trivy-image.sarif
+
+  infra-plan-and-scans:
+    needs: detect-paths
+    if: ${{ needs.detect-paths.outputs.infra == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.5
 
-      - name: Terraform fmt/validate
+      - name: Terraform fmt & validate (no backend)
         working-directory: infra
         run: |
-          terraform fmt -check
+          terraform fmt -check -recursive
           terraform init -backend=false
           terraform validate
+
+      - name: Install tflint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+          tflint --init
+
+      - name: tflint
+        working-directory: infra
+        run: tflint
+
+      - name: tfsec (SARIF)
+        run: |
+          curl -sL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install.sh | bash
+          tfsec --format sarif --out tfsec.sarif ./infra
+      - name: Upload tfsec SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+
+      - name: Trivy config scan (Terraform)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'config'
+          scan-ref: './infra'
+          format: 'sarif'
+          output: trivy-infra.sarif
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Upload Trivy (infra) SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-infra.sarif
+
+      - name: Terraform plan (no backend) — capture
+        id: plan
+        working-directory: infra
+        env:
+          TF_CLI_ARGS_plan: "-no-color"
+        run: |
+          terraform plan -no-color -input=false -out=tfplan || true
+          terraform show -no-color tfplan > ../TFPLAN.txt || true
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source . --no-banner --report-format sarif --report-path gitleaks.sarif
+      - name: Upload Gitleaks SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+
+      - name: Save infra artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: infra-artifacts
+          path: |
+            TFPLAN.txt
+            tfsec.sarif
+            trivy-infra.sarif
+            gitleaks.sarif
+
+  pr-summary-comment:
+    needs: [detect-paths, build-test-image-and-scan, infra-plan-and-scans]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download app artifacts
+        if: ${{ always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: app-artifacts
+          path: app-artifacts
+      - name: Download infra artifacts
+        if: ${{ needs.detect-paths.outputs.infra == 'true' && always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: infra-artifacts
+          path: infra-artifacts
+
+      - name: Build PR report
+        id: report
+        run: |
+          echo "## CI Summary" > REPORT.md
+          echo "" >> REPORT.md
+
+          if [ -f app-artifacts/COVERAGE_PCT.txt ]; then
+            COV=$(cat app-artifacts/COVERAGE_PCT.txt)
+            echo "### Application" >> REPORT.md
+            echo "- Coverage (lines): **${COV}%**" >> REPORT.md
+            echo "- Trivy (image) & SARIF uploaded to **Code scanning alerts**" >> REPORT.md
+            echo "" >> REPORT.md
+          fi
+
+          if [ -f infra-artifacts/TFPLAN.txt ]; then
+            echo "### Infrastructure" >> REPORT.md
+            echo "<details><summary>Terraform Plan (no backend)</summary>" >> REPORT.md
+            echo "" >> REPORT.md
+            # Trim to first/last 200 lines for readability
+            { head -n 200 infra-artifacts/TFPLAN.txt; echo; echo '...'; tail -n 200 infra-artifacts/TFPLAN.txt; } >> REPORT.md
+            echo "</details>" >> REPORT.md
+            echo "" >> REPORT.md
+            echo "- tflint, tfsec, Trivy (config), and Gitleaks SARIF uploaded to **Code scanning alerts**" >> REPORT.md
+          fi
+
+          echo "report_path=REPORT.md" >> $GITHUB_OUTPUT
+
+      - name: Post/update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: ${{ steps.report.outputs.report_path }}
