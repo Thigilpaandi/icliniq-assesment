@@ -129,7 +129,6 @@ jobs:
 
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        with:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Gitleaks SARIF
