@@ -1,10 +1,24 @@
-name: infra-deploy (on PR merge)
+name: infra-destroy (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "DESTROY" to confirm you want to delete the infra.'
+        required: true
+        default: ""
+      workspace:
+        description: 'Terraform workspace (e.g., dev, prod).'
+        required: false
+        default: 'default'
+
+concurrency:
+  group: infra-destroy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  terraform-apply:
+  terraform-destroy:
+    if: github.event.inputs.confirm == 'DESTROY'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,7 +42,13 @@ jobs:
         working-directory: infra
         run: terraform init -input=false
 
-      - name: Terraform apply
+      - name: Select workspace
+        working-directory: infra
+        run: |
+          terraform workspace select "${{ github.event.inputs.workspace }}" \
+            || terraform workspace new "${{ github.event.inputs.workspace }}"
+
+      - name: Plan (destroy) – preview
         working-directory: infra
         env:
           TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
@@ -37,6 +57,14 @@ jobs:
           TF_VAR_deployer_service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-        run: |
-
-          terraform destroy -input=false -auto-approve 
+        run: terraform plan -destroy -input=false
+      - name: Terraform destroy – execute
+        working-directory: infra
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ vars.GCP_REGION }}
+          TF_VAR_artifact_registry_repo: ${{ vars.ARTIFACT_REPO || 'apps' }}
+          TF_VAR_deployer_service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: terraform destroy -input=false -auto-approve
