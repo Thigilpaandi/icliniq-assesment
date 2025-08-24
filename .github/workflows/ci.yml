@@ -46,7 +46,9 @@ jobs:
 
       - name: Lint
         working-directory: app/src
+
         continue-on-error: true
+
         run: npm run lint
 
       - name: Unit tests with coverage
