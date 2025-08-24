@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Lint
-        working-directory: app
+        working-directory: app/src
         run: npm run lint
 
       - name: Unit tests with coverage
