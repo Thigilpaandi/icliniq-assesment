@@ -1,0 +1,10 @@
+import { Pool } from 'pg';
+
+export const pool = new Pool({
+  host: process.env.DB_HOST,              // 10.43.0.3
+  port: Number(process.env.DB_PORT || 5432),
+  database: process.env.DB_NAME,          // from Secret Manager
+  user: process.env.DB_USER,              // from Secret Manager
+  password: process.env.DB_PASSWORD,      // from Secret Manager
+  ssl: false, // private IP; set true only if you add certificates
+});

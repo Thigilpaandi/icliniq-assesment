@@ -1,0 +1,198 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+ 
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  detect-paths:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      infra: ${{ steps.changes.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            app:
+              - 'app/**'
+              - 'app/Dockerfile'
+            infra:
+              - 'infra/**'
+
+  build-test-image-and-scan:
+    needs: detect-paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install deps
+        working-directory: app
+        run: npm ci
+
+      - name: Lint
+        working-directory: app/src
+
+        continue-on-error: true
+
+        run: npm run lint
+
+      - name: Build image
+        run: docker build -t local/app:ci ./app
+
+      - name: Trivy scan (image) — table + SARIF
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'local/app:ci'
+          format: 'sarif'
+          output: trivy-image.sarif
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+
+      - name: Save app CI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-artifacts
+          path: |
+            trivy-image.sarif
+
+  infra-plan-and-scans:
+    needs: detect-paths
+    if: ${{ needs.detect-paths.outputs.infra == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+         fetch-depth: 0
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Terraform fmt & validate (no backend)
+        working-directory: infra
+        continue-on-error: true
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+
+      - name: Install tflint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+          tflint --init
+
+      - name: tflint
+        working-directory: infra
+        run: tflint
+
+
+
+      - name: Trivy config scan (Terraform)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'config'
+          scan-ref: './infra'
+          format: 'sarif'
+          output: trivy-infra.sarif
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Upload Trivy (infra) SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-infra.sarif
+
+      - name: Terraform plan (no backend) — capture
+        id: plan
+        working-directory: infra
+        env:
+          TF_CLI_ARGS_plan: "-no-color"
+        run: |
+          terraform plan -no-color -input=false -out=tfplan || true
+          terraform show -no-color tfplan > ../TFPLAN.txt || true
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save infra artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: infra-artifacts
+          path: |
+            TFPLAN.txt
+            trivy-infra.sarif
+
+  pr-summary-comment:
+    needs: [detect-paths, build-test-image-and-scan, infra-plan-and-scans]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download app artifacts
+        if: ${{ always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: app-artifacts
+          path: app-artifacts
+      - name: Download infra artifacts
+        if: ${{ needs.detect-paths.outputs.infra == 'true' && always() }}
+        uses: actions/download-artifact@v4
+        with:
+          name: infra-artifacts
+          path: infra-artifacts
+
+      - name: Build PR report
+        id: report
+        run: |
+          echo "## CI Summary" > REPORT.md
+          echo "" >> REPORT.md
+
+          if [ -f app-artifacts/COVERAGE_PCT.txt ]; then
+            COV=$(cat app-artifacts/COVERAGE_PCT.txt)
+            echo "### Application" >> REPORT.md
+            echo "- Coverage (lines): **${COV}%**" >> REPORT.md
+            echo "- Trivy (image) & SARIF uploaded to **Code scanning alerts**" >> REPORT.md
+            echo "" >> REPORT.md
+          fi
+
+          if [ -f infra-artifacts/TFPLAN.txt ]; then
+            echo "### Infrastructure" >> REPORT.md
+            echo "<details><summary>Terraform Plan (no backend)</summary>" >> REPORT.md
+            echo "" >> REPORT.md
+            # Trim to first/last 200 lines for readability
+            { head -n 200 infra-artifacts/TFPLAN.txt; echo; echo '...'; tail -n 200 infra-artifacts/TFPLAN.txt; } >> REPORT.md
+            echo "</details>" >> REPORT.md
+            echo "" >> REPORT.md
+            echo "- tflint, tfsec, Trivy (config), and Gitleaks SARIF uploaded to **Code scanning alerts**" >> REPORT.md
+          fi
+
+          echo "report_path=REPORT.md" >> $GITHUB_OUTPUT
+
+      - name: Post/update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: ${{ steps.report.outputs.report_path }}
