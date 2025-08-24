@@ -45,6 +45,17 @@ app.get('/healthz', (_req,res)=>res.status(200).json({status:'ok'}));
 /**
  * API routes
  */
+// src/routes/index.ts
+router.get('/db/ping', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('select now() as now');
+    res.json({ ok: true, now: rows[0].now });
+  } catch (e) {
+    console.error('db ping failed:', e);
+    res.status(500).json({ ok: false });
+  }
+});
+
 app.use('/api/v1', api);
 
 /**
