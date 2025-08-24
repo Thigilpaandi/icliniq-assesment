@@ -35,7 +35,6 @@ resource "google_service_networking_connection" "dep" {
   network  = var.private_network_id
   service  = "servicenetworking.googleapis.com"
   reserved_peering_ranges = []
-
 }
 
 
