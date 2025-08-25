@@ -187,3 +187,35 @@ infra/                    # Terraform root + modules
 
 ---
 
+12) CI (Pull Request) Jobs — What runs on each PR
+
+All CI jobs are signal-first and non-blocking (every step uses continue-on-error: true). Findings are surfaced to developers without hard-failing the PR, and a concise sticky PR comment summarizes the results.
+
+Jobs
+
+gitleaks
+Scans the repository for potential secrets and adds a short status line to the summary.
+
+node-ci (runs in app/)
+Sets up Node 20, runs npm ci from the lockfile, then:
+
+lint (only if a script exists),
+
+TypeScript compile check (only if config/script present),
+
+unit tests (only if a script exists),
+
+npm audit (high severity and above, non-blocking).
+Each step reports its outcome to the summary.
+
+container-scan
+Builds the Docker image from app/Dockerfile (no push) and scans it with Trivy.
+The Actions Summary shows a compact table, plus counts of CRITICAL/HIGH issues.
+
+terraform-checks (runs in infra/)
+Executes terraform fmt -check, init -backend=false, and validate, then runs tfsec (soft-fail) to surface Terraform security findings.
+
+pr-summary
+Aggregates the mini-summaries from each job, writes them to the Actions Summary, and posts/updates a sticky PR comment (marked with <!-- ci-quick-summary -->).
+
+Purpose: provide fast, actionable feedback (lint/test/security) without blocking iteration; enforcement/policy can be added later if desired.
