@@ -121,7 +121,22 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-infra.sarif
+      - name: tfsec (Terraform security) — SARIF
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: infra
+          soft_fail: true                # non-blocking
+          additional_args: >-
+            --format sarif
+            --out tfsec.sarif
+            --minimum-severity HIGH
+        continue-on-error: true
 
+      - name: Upload tfsec SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+        continue-on-error: true
       - name: Terraform plan (no backend) — capture
         id: plan
         working-directory: infra

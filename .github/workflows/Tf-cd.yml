@@ -10,6 +10,7 @@ on:
 
 jobs:
   terraform-apply:
+    environment: production
     if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     permissions:
