@@ -1,7 +1,10 @@
 name: ci
 on:
   pull_request:
-
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
