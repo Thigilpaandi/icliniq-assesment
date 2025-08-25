@@ -1,10 +1,7 @@
 name: ci
 on:
   pull_request:
-permissions:
-  contents: read
-  security-events: write
-  pull-requests: write
+
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
@@ -243,9 +240,9 @@ jobs:
         id: combine
         env:
           GITLEAKS:  ${{ needs.gitleaks.outputs.summary_b64 }}
-          NODE:      ${{ needs.node-ci.outputs.summary_b64 }}
-          SCAN:      ${{ needs.container-scan.outputs.summary_b64 }}
-          TF:        ${{ needs.terraform-checks.outputs.summary_b64 }}
+          NODE:      ${{ needs['node-ci'].outputs.summary_b64 }}
+          SCAN:      ${{ needs['container-scan'].outputs.summary_b64 }}
+          TF:        ${{ needs['terraform-checks'].outputs.summary_b64 }}
         run: |
           decode() { [ -n "$1" ] && (echo "$1" | base64 -d 2>/dev/null || echo "$1" | base64 --decode); }
           {
