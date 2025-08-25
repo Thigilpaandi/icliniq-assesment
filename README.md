@@ -186,36 +186,43 @@ infra/                    # Terraform root + modules
 ```
 
 ---
+## CI (Pull Request) Jobs
 
-12) CI (Pull Request) Jobs — What runs on each PR
+All CI steps run with `continue-on-error: true` so you get fast, non-blocking feedback. Results are summarized in a **sticky PR comment** titled **“CI Summary”** and mirrored to the Actions **run summary**.
 
-All CI jobs are signal-first and non-blocking (every step uses continue-on-error: true). Findings are surfaced to developers without hard-failing the PR, and a concise sticky PR comment summarizes the results.
+### What runs on each PR
 
-Jobs
+* **`gitleaks` — Secret scanning**
 
-gitleaks
-Scans the repository for potential secrets and adds a short status line to the summary.
+  * Scans the repo for hard-coded secrets (tokens, keys, etc.).
+  * Adds a short status line to the PR summary.
 
-node-ci (runs in app/)
-Sets up Node 20, runs npm ci from the lockfile, then:
+* **`node-ci` — App checks (`app/`)**
 
-lint (only if a script exists),
+  * Sets up **Node 20** and installs deps via `npm ci` (lockfile-only).
+  * **Lint**: runs if a `lint` script exists.
+  * **TypeScript compile**: runs if `tsconfig.json` or a `tsc` script exists.
+  * **Unit tests**: run if a `test` script exists.
+  * **`npm audit`** (high+ severity), non-blocking.
+  * Each step’s outcome (success/failed/skipped) is included in the PR summary.
 
-TypeScript compile check (only if config/script present),
+* **`container-scan` — Image build & scan**
 
-unit tests (only if a script exists),
+  * Builds the Docker image from `app/Dockerfile` (no push).
+  * Scans the image with **Trivy** and publishes a compact table to the run summary.
+  * The PR summary shows counts of **CRITICAL** and **HIGH** findings.
 
-npm audit (high severity and above, non-blocking).
-Each step reports its outcome to the summary.
+* **`terraform-checks` — IaC validation (`infra/`)**
 
-container-scan
-Builds the Docker image from app/Dockerfile (no push) and scans it with Trivy.
-The Actions Summary shows a compact table, plus counts of CRITICAL/HIGH issues.
+  * `terraform fmt -check -recursive`
+  * `terraform init -backend=false -input=false`
+  * `terraform validate -no-color`
+  * **tfsec** security scan with **soft\_fail** (findings surfaced; PR not blocked).
+  * Step outcomes are included in the PR summary.
 
-terraform-checks (runs in infra/)
-Executes terraform fmt -check, init -backend=false, and validate, then runs tfsec (soft-fail) to surface Terraform security findings.
+* **`pr-summary` — One concise comment**
 
-pr-summary
-Aggregates the mini-summaries from each job, writes them to the Actions Summary, and posts/updates a sticky PR comment (marked with <!-- ci-quick-summary -->).
+  * Aggregates the mini-summaries from all jobs.
+  * Writes to the run summary and posts/updates a **sticky PR comment** (marker: `<!-- ci-quick-summary -->`).
 
-Purpose: provide fast, actionable feedback (lint/test/security) without blocking iteration; enforcement/policy can be added later if desired.
+> **Why this setup?** It’s **signal-first**: developers see lint/test/security results immediately without blocking iteration. To enforce later, remove `continue-on-error` on specific steps or turn off tfsec soft-fail.
