@@ -1,0 +1,121 @@
+name: ci
+on:
+  pull_request:
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_ENABLE_COMMENTS: "true"
+          GITLEAKS_NOTIFY_USER_LIST: ${{ vars.GITLEAKS_USERS }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+          GITLEAKS_VERSION: "8.18.4"
+
+  node-ci:
+    runs-on: ubuntu-latest
+    needs: [gitleaks]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: |
+          if npm run | grep -q "^  lint"; then npm run lint; else echo "no lint script, skipping"; fi
+
+      - name: TypeScript build (compile check)
+        run: |
+          if [ -f tsconfig.json ] || grep -q "tsc" package.json; then npm run build; else echo "no tsc, skipping"; fi
+
+      - name: Unit tests
+        run: |
+          if npm run | grep -q "^  test"; then npm test -- --ci --reporters=default; else echo "no tests, skipping"; fi
+
+      - name: npm audit (non-blocking)
+        continue-on-error: true
+        run: npm audit --audit-level=high || true
+
+  container-scan:
+    runs-on: ubuntu-latest
+    needs: [node-ci]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (no push)
+        run: |
+          docker build \
+            -f app/Dockerfile \
+            -t secure-node-api:${{ github.run_id }}-${{ github.run_number }} \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            app
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: secure-node-api:${{ github.run_id }}-${{ github.run_number }}
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          hide-progress: true
+          output: scan-report.txt
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+      - name: Publish Trivy summary
+        run: |
+          if [[ -s scan-report.txt ]]; then
+            {
+              echo "### Container Vulnerability Report"
+              echo "<details><summary>Click to expand</summary>"
+              echo
+              echo '```'
+              cat scan-report.txt
+              echo '```'
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  terraform-checks:
+    runs-on: ubuntu-latest
+    needs: [gitleaks]
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.7.5 }
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: tfsec (non-blocking)
+        continue-on-error: true
+        uses: aquasecurity/tfsec-action@v1.0.7
+        with:
+          full_repo_scan: true
+          soft_fail: true
