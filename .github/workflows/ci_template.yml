@@ -116,7 +116,7 @@ jobs:
 
       - name: tfsec (non-blocking)
         continue-on-error: true
-        uses: aquasecurity/tfsec-action@v1.0.7
+        uses: aquasecurity/tfsec-action@v1.0.0
         with:
           full_repo_scan: true
           soft_fail: true
