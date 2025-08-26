@@ -1,4 +1,4 @@
-
+ 
 variable "project_id"        { type = string }
 variable "runtime_sa_name"   { type = string }
 variable "deployer_sa_email" { type = string }
