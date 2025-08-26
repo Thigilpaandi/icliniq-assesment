@@ -1,6 +1,7 @@
 name: infra-deploy (on PR merge)
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [closed]
     branches: [main]
