@@ -45,5 +45,4 @@ jobs:
           TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
-          terraform plan -input=false -out=tfplan
-          terraform apply -input=false -auto-approve tfplan
+          terraform apply -destroy
