@@ -11,7 +11,7 @@ on:
 
 jobs:
   terraform-apply:
-    environment: production
+    #environment: production
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,4 +45,6 @@ jobs:
           TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
+          export GOOGLE_HTTP_TIMEOUT=120s
+          export CLOUDSDK_CORE_HTTP_TIMEOUT=120
           TF_LOG=DEBUG terraform destroy -auto-approve
