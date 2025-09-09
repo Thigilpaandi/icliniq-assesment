@@ -45,4 +45,4 @@ jobs:
           TF_VAR_chat_webhook_url: ${{ secrets.CHAT_WEBHOOK_URL }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
-          terraform destroy -auto-approve -no-color -parallelism=5
+          TF_LOG=DEBUG terraform destroy -auto-approve
